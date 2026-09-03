@@ -45,7 +45,7 @@ pip install nemo-fabric-adapters-deepagents
 ```
 
 The bare adapter package does not install the NeMo Fabric runtime or harness. Use
-`deepagents>=0.6.12,<0.7.0`, `langchain>=1.3,<2.0`, and
+`deepagents>=0.6.12,<0.8.0`, `langchain>=1.3,<2.0`, and
 `langgraph>=1.2,<2.0`, the constraints supported by this release.
 
 If the existing compatible Deep Agents stack and NeMo Fabric runtime share an
@@ -71,7 +71,8 @@ harness = HarnessConfig(adapter_id="nvidia.fabric.langchain.deepagents")
 ```
 
 Use normalized `FabricConfig` fields to configure the model, workspace, skills,
-MCP servers, blocked tools, and telemetry. Use
+MCP servers, replacement system instructions, blocked tools, and telemetry.
+The adapter rejects `append` system instructions. Use
 `harness.settings.deepagents` to configure the JSON-serializable Deep
 Agents-native `interrupt_on` and `subagents` options:
 
@@ -102,6 +103,10 @@ harness = HarnessConfig(
 
 The descriptor closes both `harness.settings` and its nested `deepagents`
 object, so planning rejects unknown settings before runtime start.
+`runtime.max_turns=10` configures LangGraph with `recursion_limit=10`. This is
+a graph-superstep budget, not a promise of ten model responses or tool calls.
+One interaction can consume multiple supersteps. When `runtime.max_turns` is
+omitted, the adapter keeps the Deep Agents default.
 `interrupt_on` maps tool names to booleans or an object with
 `allowed_decisions`; supported decisions are `approve`, `edit`, `reject`, and
 `respond`. The object can also contain a static `description` and an
@@ -119,9 +124,13 @@ because a local tools policy cannot gate remote tools.
 ## Understand the Runtime Lifecycle
 
 Each NeMo Fabric runtime compiles one Deep Agents graph and retains its
-checkpointer and LangGraph thread across ordered invocations. The built-in
-subagent inherits the parent run's model, tools, skills, workspace, telemetry,
-and permissions.
+checkpointer and LangGraph thread across ordered invocations. The built-in and
+caller-defined declarative subagents are separate locally compiled graphs
+invoked through the `task` tool. They inherit the parent run's model, tools,
+skills, workspace, telemetry, and permissions. `runtime.max_turns` configures
+only the main local graph, while declarative subagent graphs retain their Deep Agents
+limits. Agent Protocol subagents run in a separate service and manage their
+own recursion limit.
 
 NeMo Relay provides the SDK-native observability integration for this adapter.
 Native OpenTelemetry and OpenInference exporters are also available through the
@@ -129,4 +138,4 @@ model provider configuration.
 
 For the complete configuration, subagent, lifecycle, and telemetry reference,
 refer to the
-[LangChain Deep Agents adapter guide](https://github.com/NVIDIA/NeMo-Fabric/tree/main/adapters/deepagents).
+[LangChain Deep Agents adapter guide](https://github.com/NVIDIA/NeMo-Fabric/tree/main/adapters/python/deepagents).
